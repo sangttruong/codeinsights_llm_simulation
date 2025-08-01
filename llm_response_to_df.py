@@ -1,7 +1,11 @@
-import json
+import requests
 import pandas as pd
 
-llms = ["google_gemma-3-27b-it", "meta_llama-3.1-8b-instruct", "qwen_qwen2.5-14b-instruct"]
+llms = [
+    "google_gemma-3-27b-it",
+    "meta_llama-3.1-8b-instruct",
+    "qwen_qwen2.5-14b-instruct",
+]
 scenarios = ["S1", "S2", "S3", "S4"]
 
 for llm in llms:
@@ -16,7 +20,9 @@ for llm in llms:
         elif isinstance(raw, list):
             states = raw
         else:
-            raise ValueError("JSON must be either a dict with 'request_states' or a list of state‐objects")
+            raise ValueError(
+                "JSON must be either a dict with 'request_states' or a list of state‐objects"
+            )
 
         # Extract completion text
         texts = []
@@ -33,10 +39,7 @@ for llm in llms:
 
         # Create DataFrame
         if scenario == "S1":
-            df = pd.DataFrame({
-                'question_id': [int(x) for x in ids],
-                'text': texts
-            })
+            df = pd.DataFrame({"question_id": [int(x) for x in ids], "text": texts})
         else:
             parsed = [
                 (int(sid), int(qid), text)
