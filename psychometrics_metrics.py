@@ -6,9 +6,10 @@ from scipy.stats import pearsonr, spearmanr
 import seaborn as sns
 from tueplots import bundles
 
-df1 = pd.read_csv('/Users/kazunorifukuhara/Downloads/Model Response Results/gemma-3-27b-it_scenario2_result.csv')
-df2 = pd.read_csv('/Users/kazunorifukuhara/Downloads/Model Response Results/gemma-3-27b-it_scenario3_result.csv')
-df3 = pd.read_csv('/Users/kazunorifukuhara/Downloads/Model Response Results/gemma-3-27b-it_scenario4_result.csv')
+llm = "mistral"
+df1 = pd.read_csv('https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/scenario_results/{llm}/{llm}_scenario2.csv')
+df2 = pd.read_csv('https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/scenario_results/{llm}/{llm}_scenario3.csv')
+df3 = pd.read_csv('https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/scenario_results/{llm}/{llm}_scenario4.csv')
 df = pd.concat(
     [df1, df2, df3],
     axis=0,           # stack rows

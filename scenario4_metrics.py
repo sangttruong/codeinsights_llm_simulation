@@ -27,12 +27,14 @@ from apted.helpers import Tree
 import tree_sitter_cpp as tscpp
 from tree_sitter import Language, Parser
 
-scenario4_df = pd.read_csv('/Users/kazunorifukuhara/Downloads/gemma-3-27b-it_scenario4.csv')
+llm = "mistral"
+scenario = 4
+scenario4_df = pd.read_csv('https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/scenario_results/{llm}/{llm}_scenario{scenario}.csv')
 scenario4_df['question_id'] = scenario4_df['question_id'].astype(str)
 scenario4_df['student_id'] = scenario4_df['student_id'].astype(str)
 scenario4_student_df = pd.read_csv("https://huggingface.co/datasets/Kazchoko/my_dataset/resolve/main/Scenario4_data.csv")
 question = pd.read_csv(
-    '/Users/kazunorifukuhara/Downloads/Measurement from Dynamic Data Research/Important Data 4:16/final_question.csv'
+    'https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/codeinsights_question.csv'
 )
 
 #Define Function

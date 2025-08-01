@@ -13,11 +13,13 @@ import json
 
 #Load Data
 #Load LLM generated code
-scenario1_df = pd.read_csv('/Users/kazunorifukuhara/Downloads/meta_llama-3.3-70b-instruct_scenario1.csv')
+llm = "mistral"
+scenario = 1
+scenario1_df = pd.read_csv('https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/scenario_results/{llm}/{llm}_scenario{scenario}.csv')
 scenario1_df['question_id'] = scenario1_df['question_id'].astype(str)
 scenario1_student_df = pd.read_csv("https://huggingface.co/datasets/Kazchoko/my_dataset/resolve/main/Scenario1_2_data.csv")
 question = pd.read_csv(
-    '/Users/kazunorifukuhara/Downloads/Measurement from Dynamic Data Research/Important Data 4:16/final_question.csv'
+    'https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/codeinsights_question.csv'
 )
 
 #Define Functions
@@ -131,7 +133,7 @@ def parse_unittests(block: str):
             "output":     m.group(3).strip()
         })
     return tests
-    
+
 scenario1_student_df['tests'] = scenario1_student_df['question_unittests'].apply(parse_unittests)
 result = { str(int(qid)): tests for qid, tests in zip(scenario1_student_df['question_id'], scenario1_student_df['tests']) }
 jsonfile = json.dumps(result, indent=2)

@@ -24,14 +24,16 @@ import tree_sitter_cpp as tscpp
 from tree_sitter import Language, Parser
 
 #Load Data
-scenario2_df = pd.read_csv('/Users/kazunorifukuhara/Downloads/gemma-3-27b-it_scenario2.csv')
+llm = "mistral"
+scenario = 2
+scenario2_df = pd.read_csv('https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/scenario_results/{llm}/{llm}_scenario{scenario}.csv')
 scenario2_df['question_id'] = scenario2_df['question_id'].astype(str)
 scenario2_df['student_id'] = scenario2_df['student_id'].astype(str)
 scenario2_student_df = pd.read_csv("https://huggingface.co/datasets/Kazchoko/my_dataset/resolve/main/Scenario1_2_data.csv")
 scenario2_student_df["student_id"] = scenario2_student_df["student_id"].astype(str)
 scenario2_student_df["question_id"] = scenario2_student_df["question_id"].astype(int).astype(str)
 question = pd.read_csv(
-    '/Users/kazunorifukuhara/Downloads/Measurement from Dynamic Data Research/Important Data 4:16/final_question.csv'
+    'https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/codeinsights_question.csv'
 )
 
 #Define Function
