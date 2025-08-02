@@ -22,6 +22,7 @@ OUTPUT_FOLDER = "codeinsights_llm_simulation/"
 
 if __name__ == "__main__":
     # Convert outputs to dataframe
+    print("Converting results to df...")
     for scenario in LIST_SCENARIOS:
         for llm in LIST_LLMS:
             output_path = os.path.join(
@@ -34,12 +35,21 @@ if __name__ == "__main__":
 
             # Save output dataframe
             scenario_id = scenario[1:]
+            llm = "_".join(llm.split("_")[1:])
+            os.makedirs(
+                os.path.join(
+                    OUTPUT_FOLDER,
+                    f"scenario_results/{llm}",
+                ),
+                exist_ok=True,
+            )
             output_df.to_csv(
                 os.path.join(
                     OUTPUT_FOLDER,
                     f"scenario_results/{llm}/{llm}_scenario{scenario_id}.csv",
                 )
             )
+            print(f"Saved {scenario} - {llm}")
 
     # Read question data
     question_data = pd.read_csv(
@@ -49,6 +59,7 @@ if __name__ == "__main__":
     # Compute metrics
     all_results = {}
     for scenario in LIST_SCENARIOS:
+        print(f"Computing metrics for scenario {scenario}...")
         scenario_id = scenario[1:]
         scenario_student_df = get_scenario_student_df(
             scenario=scenario, data_folder=DATA_FOLDER
@@ -61,32 +72,60 @@ if __name__ == "__main__":
         all_results[scenario] = {}
 
         for llm in LIST_LLMS:
-            scenario_df = pd.read_csv(
+            print(f"    + LLM: {llm}...")
+            # Load results
+            llm = "_".join(llm.split("_")[1:])
+            scenario_output_df = pd.read_csv(
                 os.path.join(
                     OUTPUT_FOLDER,
                     f"scenario_results/{llm}/{llm}_scenario{scenario_id}.csv",
                 )
             )
+            scenario_output_df["question_id"] = scenario_output_df[
+                "question_id"
+            ].astype(str)
+            if scenario != "S1":
+                scenario_output_df["student_id"] = scenario_output_df[
+                    "student_id"
+                ].astype(str)
 
-            scenario_output_df = pd.read_csv(
-                os.path.join(
-                    OUTPUT_FOLDER,
-                    f"opensource_llm_output/{llm}/{scenario}/scenario_state.json",
-                ),
-                dtype={"question_id": str},
-            )
-
+            # Run LLM-generated code
             scenario_result_df = compile_and_execute(
                 question_data=question_data,
                 scenario_output_df=scenario_output_df,
                 scenario_testcase_json=scenario_testcase_json,
+                has_stid=(scenario != "S1"),
             )
+            kwargs = {}
 
+            if scenario == "S4":
+                # Filter student data to only those which have LLM results
+                scenario_student_df[["student_id", "question_id"]] = (
+                    scenario_student_df[["student_id", "question_id"]].astype(str)
+                )
+
+                # Now do the inner‐join on those string keys
+                scenario_student_subset = scenario_student_df.merge(
+                    scenario_result_df[["student_id", "question_id"]].drop_duplicates(),
+                    on=["student_id", "question_id"],
+                    how="inner",
+                )
+
+                # Run student code
+                scenario_student_result_df = compile_and_execute(
+                    question_data=question_data,
+                    scenario_output_df=scenario_student_subset,
+                    scenario_testcase_json=scenario_testcase_json,
+                )
+                kwargs["scenario_student_result_df"] = scenario_student_result_df
+
+            # Compute metrics
             all_results[scenario][llm] = compute_scenario_metrics(
                 scenario=scenario,
-                scenario_df=scenario_df,
+                scenario_df=scenario_output_df,
                 scenario_result_df=scenario_result_df,
                 scenario_student_df=scenario_student_df,
+                **kwargs,
             )
 
     # Save all results

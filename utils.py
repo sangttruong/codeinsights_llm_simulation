@@ -6,14 +6,19 @@ import json
 import os
 import tempfile
 import subprocess
+import numpy as np
+import time
 from jinja2 import Template
 from typing import List, Dict
 from scenario2_metrics import CodeSimilarityCalculator
 
 
 def response_to_df(path, scenario):
-    response = requests.get(path)
-    raw = response.json()
+    if "http" in path:
+        response = requests.get(path)
+        raw = response.json()
+    else:
+        raw = json.load(open(path, "r", encoding="utf8"))
 
     # Figure out where the state‐objects live
     if isinstance(raw, dict) and "request_states" in raw:
@@ -194,7 +199,7 @@ def get_scenario_student_df(scenario, data_folder):
 
 
 def get_unittest_infos(scenario, data_folder):
-    scenario_student_df = scenario_student_df(scenario, data_folder)
+    scenario_student_df = get_scenario_student_df(scenario, data_folder)
     scenario_student_df["tests"] = scenario_student_df["question_unittests"].apply(
         parse_unittests
     )
@@ -210,13 +215,19 @@ def get_unittest_infos(scenario, data_folder):
     return scenario_testcase_json
 
 
-def compile_and_execute(question_data, scenario_output_df, scenario_testcase_json):
+def compile_and_execute(
+    question_data, scenario_output_df, scenario_testcase_json, has_stid=True
+):
     # Run LLM generated codes and make result dataframe
     scenario_results = []
 
     for i in range(len(scenario_output_df)):
         test_result = extract_student_code(scenario_output_df.iloc[i]["text"])
         id_val = int(scenario_output_df.iloc[i]["question_id"])
+        if has_stid:
+            student_id = scenario_output_df.iloc[i]["student_id"]
+        else:
+            student_id = None
         sub_question = question_data[question_data["question_id"] == id_val]
 
         # format testcases
@@ -229,11 +240,13 @@ def compile_and_execute(question_data, scenario_output_df, scenario_testcase_jso
             # record the failure with no specific testcase
             scenario_results.append(
                 {
-                    "id": id_val,
+                    "student_id": student_id,
+                    "question_id": id_val,
                     "test_case_id": None,
                     "cpp_code": None,
                     "stdout": None,
                     "expected_output": None,
+                    "run_time": None,
                 }
             )
             continue
@@ -247,11 +260,13 @@ def compile_and_execute(question_data, scenario_output_df, scenario_testcase_jso
         except Exception as e:
             scenario_results.append(
                 {
-                    "id": id_val,
+                    "student_id": student_id,
+                    "question_id": id_val,
                     "test_case_id": None,
                     "cpp_code": None,
                     "stdout": None,
                     "expected_output": None,
+                    "run_time": None,
                 }
             )
             continue
@@ -262,11 +277,13 @@ def compile_and_execute(question_data, scenario_output_df, scenario_testcase_jso
             expected_output_val = expected_output[j]
             # default row template
             row = {
-                "id": id_val,
+                "student_id": student_id,
+                "question_id": id_val,
                 "test_case_id": j,
                 "cpp_code": cpp_code,
                 "stdout": None,
                 "expected_output": expected_output_val,
+                "run_time": None,
             }
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -288,6 +305,7 @@ def compile_and_execute(question_data, scenario_output_df, scenario_testcase_jso
                     scenario_results.append(row)
                     continue
 
+                start = time.perf_counter()
                 try:
                     run_proc = subprocess.run(
                         [exe_path],
@@ -295,14 +313,18 @@ def compile_and_execute(question_data, scenario_output_df, scenario_testcase_jso
                         text=True,
                         timeout=5,  # ← kill the process if it runs longer than 10s
                     )
+                    end = time.perf_counter()
                 except subprocess.TimeoutExpired as e:
+                    end = time.perf_counter()
                     print(
                         f"Testcase {j} for question {id_val} timed out after {e.timeout}s",
                         file=sys.stderr,
                     )
                     # record the timeout as a failure
+                    row["run_time"] = "fail"
                     scenario_results.append(row)
                     continue
+                row["run_time"] = end - start
 
                 if run_proc.returncode != 0:
                     print("Runtime error:\n", run_proc.stderr, file=sys.stderr)
@@ -310,15 +332,21 @@ def compile_and_execute(question_data, scenario_output_df, scenario_testcase_jso
                     continue
                 row["stdout"] = run_proc.stdout
                 scenario_results.append(row)
+                print(f"Processed question {id_val}, test case {j}")
 
     # Store result in dataframe
     scenario_result_df = pd.DataFrame(scenario_results)
+    scenario_result_df["question_id"] = scenario_result_df["question_id"].astype(str)
+    scenario_result_df["test_case_id"] = scenario_result_df["test_case_id"].astype(str)
+    scenario_result_df["correctness"] = pd.Series(dtype="Int64")
+    scenario_result_df["stdout"] = scenario_result_df["stdout"].apply(
+        lambda x: x.strip() if isinstance(x, str) else x
+    )
     return scenario_result_df
 
 
 def compute_function_correctness(scenario_result_df, **kwargs):
     # Evaluate correctness of LLM generated code
-    scenario_result_df["correctness"] = pd.Series(dtype="Int64")
     # Where stdout == expected_output → 1, else → 0
     matches = scenario_result_df["stdout"] == scenario_result_df["expected_output"]
     scenario_result_df.loc[matches, "correctness"] = 1
@@ -326,7 +354,6 @@ def compute_function_correctness(scenario_result_df, **kwargs):
     # If test_case_id is missing, reset correctness to <NA>
     mask_missing = scenario_result_df["test_case_id"].isna()
     scenario_result_df.loc[mask_missing, "correctness"] = pd.NA
-    scenario_result_df["correctness"] = pd.Series(dtype="Int64")
     # Where stdout == expected_output → 1, else → 0
     scenario_result_df["stdout"] = scenario_result_df["stdout"].apply(
         lambda x: x.strip() if isinstance(x, str) else x
@@ -342,32 +369,7 @@ def compute_function_correctness(scenario_result_df, **kwargs):
     return {"functional_correctnes": functional_correctnes}
 
 
-def compute_ed_and_similarity(
-    scenario_df, scenario_result_df, scenario_student_df, **kwargs
-):
-    scenario_result_df["correctness"] = pd.Series(dtype="Int64")
-
-    # Where stdout == expected_output → 1, else → 0
-    scenario_result_df["stdout"] = scenario_result_df["stdout"].apply(
-        lambda x: x.strip() if isinstance(x, str) else x
-    )
-    matches = scenario_result_df["stdout"] == scenario_result_df["expected_output"]
-    scenario_result_df.loc[matches, "correctness"] = 1
-    scenario_result_df.loc[~matches, "correctness"] = 0
-
-    # If test_case_id is missing, reset correctness to <NA>
-    mask_missing = scenario_result_df["test_case_id"].isna()
-    scenario_result_df.loc[mask_missing, "correctness"] = pd.NA
-    scenario_result_df["question_id"] = scenario_result_df["question_id"].astype(str)
-    scenario_result_df["test_case_id"] = scenario_result_df["test_case_id"].astype(str)
-    scenario2_result_df = scenario_result_df.rename(
-        columns={
-            "correctness": "LLM_correctness",
-        }
-    )
-    functional_correctnes = scenario2_result_df["LLM_correctness"].mean()
-    print(f"Functional correctness: {functional_correctnes:.2%}")
-
+def verify_results(scenario_result_df, scenario_student_df):
     # Unit-test Correctness Alignment
     # Student Pass Patterns
     scenario_student_df["num_unittest"] = (
@@ -409,18 +411,23 @@ def compute_ed_and_similarity(
             "pass_unittest": "real_student_correctness",
         }
     )
-    scenario2_merged_df = scenario2_result_df.merge(
+    scenario_merged_df = scenario_result_df.merge(
         df_result,
         on=["student_id", "question_id", "test_case_id"],
         how="inner",
         # optional, to disambiguate any overlapping column names
         suffixes=("_sc2", "_sc1"),
     )
-    mask = scenario2_merged_df["LLM_correctness"].isin([0, 1]) & scenario2_merged_df[
+    mask = scenario_merged_df["LLM_correctness"].isin([0, 1]) & scenario_merged_df[
         "real_student_correctness"
     ].isin([0, 1])
-    valid = scenario2_merged_df[mask]
+    valid = scenario_merged_df[mask]
+    return scenario_merged_df, valid
 
+
+def compute_ed_and_similarity(
+    scenario_df, scenario_result_df, scenario_student_df, valid, **kwargs
+):
     # 2) check equality
     matches = valid["LLM_correctness"] == valid["real_student_correctness"]
     unit_test_correctness_alignment = matches.mean()
@@ -445,13 +452,130 @@ def compute_ed_and_similarity(
     print(f"CodeBERT Cosine Similarity: {codebert_cosine_similarity}")
 
     return {
+        "correctness_alignment": unit_test_correctness_alignment,
         "ast_edit_distance": ast_edit_distance,
         "codebert_cosine_similarity": codebert_cosine_similarity,
     }
 
 
+# Question-level mistake alignment
+def compute_mistake_alignment(scenario_merged_df, **kwargs):
+    question_props = (
+        scenario_merged_df.groupby("question_id")
+        .agg(
+            LLM_question_mistake_prop=("LLM_correctness", lambda x: (x == 0).mean()),
+            student_question_mistake_prop=(
+                "real_student_correctness",
+                lambda x: (x == 0).mean(),
+            ),
+        )
+        .reset_index()
+    )
+
+    # 2) Compute squared difference per question
+    question_props["squared_diff"] = (
+        question_props["LLM_question_mistake_prop"]
+        - question_props["student_question_mistake_prop"]
+    ) ** 2
+
+    # 3) RMSE across all questions
+    question_level_mistake_alignment_score = np.sqrt(
+        question_props["squared_diff"].mean()
+    )
+    print(
+        "Question‑level mistake alignment score:",
+        question_level_mistake_alignment_score,
+    )
+    return {"mistake_alignment": question_level_mistake_alignment_score}
+
+
+# generate dataframe for runtime analysis
+
+
+def compute_efficiency_alignment(
+    scenario_result_df, scenario_student_result_df, **kwargs
+):
+    scenario_student_result_df = scenario_student_result_df.rename(
+        columns={"run_time": "student_run_time", "cpp_code": "student_cpp_code"}
+    )
+    scenario_student_result_df["student_id"] = scenario_student_result_df[
+        "student_id"
+    ].astype(str)
+    scenario_student_result_df["question_id"] = scenario_student_result_df[
+        "question_id"
+    ].astype(str)
+    scenario_student_result_df["test_case_id"] = scenario_student_result_df[
+        "test_case_id"
+    ].astype(str)
+    scenario_result_df = scenario_result_df.rename(
+        columns={"run_time": "LLM_run_time", "cpp_code": "LLM_cpp_code"}
+    )
+    student_runtime_subset = scenario_student_result_df[
+        [
+            "student_id",
+            "question_id",
+            "test_case_id",
+            "student_cpp_code",
+            "student_run_time",
+        ]
+    ]
+    LLM_runtime_subset = scenario_result_df[
+        ["student_id", "question_id", "test_case_id", "LLM_cpp_code", "LLM_run_time"]
+    ]
+    runtime_data = student_runtime_subset.merge(
+        LLM_runtime_subset,
+        on=["student_id", "question_id", "test_case_id"],
+        how="inner",
+    )
+    # 1) coerce to float, turning non‑numbers into NaN
+    runtime_data["student_rt_num"] = pd.to_numeric(
+        runtime_data["student_run_time"], errors="coerce"
+    )
+    runtime_data["LLM_rt_num"] = pd.to_numeric(
+        runtime_data["LLM_run_time"], errors="coerce"
+    )
+    mask = runtime_data["student_rt_num"].notna() & runtime_data["LLM_rt_num"].notna()
+    # 3) Compute the efficiency ratio: student_time / LLM_time
+    #    (a ratio >1 means student is slower; <1 means LLM is slower)
+    runtime_data.loc[mask, "efficiency_ratio"] = (
+        runtime_data.loc[mask, "student_rt_num"] / runtime_data.loc[mask, "LLM_rt_num"]
+    )
+    efficiency_alignment_score = runtime_data["efficiency_ratio"].mean()
+    print(f"Efficiency alignment score: {efficiency_alignment_score}")
+    return {"efficiency_alignment": efficiency_alignment_score}
+
+
 def compute_scenario_metrics(scenario, **kwargs):
     if scenario == "S1":
         return compute_function_correctness(**kwargs)
+
     elif scenario == "S2":
-        return compute_ed_and_similarity(**kwargs)
+        _, valid = verify_results(
+            kwargs["scenario_result_df"], kwargs["scenario_student_df"]
+        )
+        metrics = compute_function_correctness(**kwargs)
+        metrics.update(compute_ed_and_similarity(valid=valid, **kwargs))
+        return metrics
+
+    elif scenario == "S3":
+        scenario_merged_df, valid = verify_results(
+            kwargs["scenario_result_df"], kwargs["scenario_student_df"]
+        )
+        metrics = compute_function_correctness(**kwargs)
+        metrics.update(compute_ed_and_similarity(valid=valid, **kwargs))
+        metrics.update(
+            compute_mistake_alignment(scenario_merged_df=scenario_merged_df, **kwargs)
+        )
+        return metrics
+
+    elif scenario == "S4":
+        scenario_merged_df, valid = verify_results(
+            kwargs["scenario_result_df"], kwargs["scenario_student_df"]
+        )
+        metrics = compute_function_correctness(**kwargs)
+        metrics.update(compute_ed_and_similarity(valid=valid, **kwargs))
+        metrics.update(compute_efficiency_alignment(**kwargs))
+        return metrics
+
+    else:
+        raise NotImplementedError(f"Scenario {scenario} is not implemented.")
