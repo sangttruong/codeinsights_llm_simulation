@@ -21,6 +21,8 @@ os.environ['GOOGLE_API_KEY'] = 'APIKEY'
 os.environ['OPENAI_API_KEY'] = 'APIKEY'
 os.environ["MISTRAL_API_KEY"] = 'APIKEY'
 
+OUTPUT_FOLDER = "codeinsights_llm_simulation/"
+
 @dataclass
 class TestCase:
     """Structured representation of a test case."""
@@ -240,7 +242,7 @@ class DataProcessor:
     """Handles data loading and processing operations."""
     
     def __init__(self):
-        self.base_url = "https://huggingface.co/datasets/Kazchoko/my_dataset/resolve/main/"
+        self.base_url = "https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/"
         self._cache = {}
     
     @functools.lru_cache(maxsize=None)
@@ -254,7 +256,7 @@ class DataProcessor:
     
     def process_scenario_1(self) -> List[ProcessedQuestion]:
         """Process scenario 1 data efficiently."""
-        df = self.load_data("Scenario1_2_data.csv")
+        df = self.load_data("Scenario1_full_data.csv")
         processed = []
         
         for question_id, question_df in df.groupby("question_unittest_id"):
@@ -279,9 +281,9 @@ class DataProcessor:
         
         return processed
     
-    def process_scenario_2(self) -> List[ProcessedQuestion]:
+    def process_scenario_2_3_4(self, scenario: str, prompt_func) -> List[ProcessedQuestion]:
         """Process scenario 2 with student profiling."""
-        df = self.load_data("Scenario1_2_data.csv")
+        df = self.load_data(f"Scenario{scenario}_full_data.csv")
         student_topic = self.load_data("student_performace_by_topic.csv") 
         processed = []
         
@@ -303,7 +305,7 @@ class DataProcessor:
                 if not test_cases:
                     continue
                 
-                prompt = self._build_scenario_2_prompt(student_profile, target, examples)
+                prompt = self.prompt_func(student_profile, target, examples)
                 
                 processed.append(ProcessedQuestion(
                     question_id=target.get("question_unittest_id"),
@@ -345,6 +347,78 @@ class DataProcessor:
         )
         
         return prompt
+
+    def _build_scenario_3_prompt(self, student_profile: str, target: pd.Series, examples: List[pd.Series]) -> str:
+        """Build scenario 3 prompt with examples."""
+        prompt = (
+                    "=== Student Profile ===\n"
+                    f"{student_level_prompt}\n"
+                    "When students submit a code to the platform, it will be tested by number of unit tests, where\n"
+                    "- Unit test pass rate = proportion of unit tests passed with the code\n"
+                    "- Full pass rate   = proportion of code passing all unit tests\n\n"
+                    "=== Past Mistake Examples ===\n"
+        )
+        for n, ex in enumerate(examples, start=1):
+            prompt += (
+                        f"Example {n} (Week {ex['week']}, Topic: {ex['topic']}):\n"
+                        f"Question: {ex['question_name']} — {ex['question_text']}\n"
+                        "Template:\n"
+                        f"{ex['question_template']}\n"
+                        "Student's Response Code with Error:\n"
+                        f"{ex['response_mistake']}\n\n"
+            )
+        
+        prompt += (
+                    "=== New Target Problem ===\n"
+                    f"Week: {target['week']}, Topic: {target['topic']}\n"
+                    f"Question: {target['question_name']} — {target['question_text']}\n"
+                    + "Template:\n"
+                    f"{target['question_template']}\n\n"
+                    "⚠**Instructions:**\n"
+                    "1. Mimic your own coding style, naming conventions, indentation, and typical error patterns from the examples.\n"
+                    "2. Introduce a mistake you are likely to make (e.g., off‑by‑one index, wrong initialization, missing edge case).\n"
+                    "3. Do **not** produce a fully correct solution or add unfamiliar optimizations.\n\n"
+                    "4. Include any needed class definitions, and make sure the code is compatible with the Unit Test Input.\n"
+                    "5. Provide ONLY your C++ implementation that will replace the {{ STUDENT_ANSWER }} block in the template.\n"
+                    "6. Do NOT reproduce any part of the template.\n"
+                    "7. Do NOT emit `int main()` (it’s already declared).\n\n"
+                    "IMPORTANT: your entire response must be exactly one Markdown C++ code‑block:\n"
+                    "1. First line: ```cpp\n"
+                    "2. Last line: ```\n"
+                    "No extra characters, whitespace, or text before/after.\n")
+        
+        return prompt
+
+    def _build_scenario_4_prompt(self, student_profile: str, target: pd.Series, examples: List[pd.Series]) -> str:
+        """Build scenario 4 prompt with examples."""
+        prompt = (
+                    f"Week: {target['week']}\n"
+                    f"Topic: {target['topic']}\n\n"
+        )
+        for n, ex in enumerate(examples, start=1):
+            prompt += (
+                        f"Example {n}:\n"
+                        f"Question: {ex['question_name']} — {ex['question_text']}\n"
+                        "Template:\n"
+                        f"{ex['question_template']}\n"
+                        "Your Code:\n"
+                        f"{ex['response']}\n\n"
+            )
+        prompt += (
+                    "Now, using that same student's coding style, attempt this:\n"
+                    f"Question: {target['question_name']} — {target['question_text']}\n\n"
+                    + "Template:\n"
+                    f"{target['question_template']}\n\n"
+                    "Provide ONLY your C++ implementation that will replace the {{ STUDENT_ANSWER }} block in the template.  "
+                    "– Do NOT reproduce any part of the template  "
+                    "– Do NOT emit `int main()` (it’s already declared)  "
+                    "– Ensure your code is correct, handles all edge cases, and includes any needed class definitions  "
+                    "– Match the student’s usual efficiency style.\n\n"
+                    "IMPORTANT: your entire response must be exactly one Markdown C++ code‑block:\n"
+                    "1. First line: ```cpp\n"
+                    "2. Last line: ```\n"
+                    "No extra whitespace or text before/after.\n"
+        )
 
 def run_scenario_with_all_models(scenario_name: str, prompts: List[str], 
                                question_ids: List[str], student_ids: List[str] = None) -> Dict[str, pd.DataFrame]:
@@ -432,7 +506,7 @@ def main():
         logger.info("PROCESSING SCENARIO 2")
         logger.info("=" * 50)
         
-        scenario2_data = processor.process_scenario_2()
+        scenario2_data = processor.process_scenario_2_3_4("2", _build_scenario_2_prompt)
         scenario2_prompts = [item.prompt for item in scenario2_data]
         scenario2_question_ids = [item.question_id for item in scenario2_data]
         scenario2_student_ids = [item.student_id for item in scenario2_data]
@@ -444,6 +518,42 @@ def main():
             scenario2_student_ids
         )
         all_results['scenario2'] = scenario2_results
+
+        # Process Scenario 3
+        logger.info("=" * 50)
+        logger.info("PROCESSING SCENARIO 3")
+        logger.info("=" * 50)
+        
+        scenario3_data = processor.process_scenario_2_3_4("3", _build_scenario_3_prompt)
+        scenario3_prompts = [item.prompt for item in scenario3_data]
+        scenario3_question_ids = [item.question_id for item in scenario3_data]
+        scenario3_student_ids = [item.student_id for item in scenario3_data]
+        
+        scenario3_results = run_scenario_with_all_models(
+            "Scenario 3",
+            scenario3_prompts,
+            scenario3_question_ids,
+            scenario3_student_ids
+        )
+        all_results['scenario3'] = scenario3_results
+
+        # Process Scenario 4
+        logger.info("=" * 50)
+        logger.info("PROCESSING SCENARIO 4")
+        logger.info("=" * 50)
+        
+        scenario4_data = processor.process_scenario_2_3_4("4", _build_scenario_4_prompt)
+        scenario4_prompts = [item.prompt for item in scenario4_data]
+        scenario4_question_ids = [item.question_id for item in scenario4_data]
+        scenario4_student_ids = [item.student_id for item in scenario4_data]
+        
+        scenario4_results = run_scenario_with_all_models(
+            "Scenario 4",
+            scenario4_prompts,
+            scenario4_question_ids,
+            scenario4_student_ids
+        )
+        all_results['scenario4'] = scenario4_results
         
         # Print summary
         logger.info("=" * 50)
@@ -473,6 +583,10 @@ if __name__ == "__main__":
     # Save csv
     for scenario_name, scenario_results in all_results.items():
          for model_name, df in scenario_results.items():
-             filename = f"{model_name}_{scenario_name}.csv"
-             df.to_csv(filename, index=False)
-             print(f"Saved {filename}")
+            target_dir = os.path.join(OUTPUT_FOLDER, "scenario_results", model_name)
+            os.makedirs(target_dir, exist_ok=True)
+            out_path = os.path.join(
+                target_dir,
+                f"{model_name}_{scenario_name}.csv"
+            )
+            df.to_csv(out_path, index=False)

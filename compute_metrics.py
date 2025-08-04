@@ -9,27 +9,35 @@ from utils import (
     get_scenario_student_df,
 )
 
-LIST_LLMS = [
+LIST_OS_LLMS = [
     "google_gemma-3-27b-it",
     "meta_llama-3.1-8b-instruct",
     "qwen_qwen2.5-14b-instruct",
 ]
 
+LIST_LLMS = [
+    "google_gemma-3-27b-it",
+    "meta_llama-3.1-8b-instruct",
+    "qwen_qwen2.5-14b-instruct",
+    "gpt-4o",
+    "claude-3-5",
+    "gemini-2.5-pro",
+    "mistral"
+]
+
 LIST_SCENARIOS = ["S1", "S2", "S3", "S4"]
 
-DATA_FOLDER = "my_dataset"
-OUTPUT_FOLDER = "codeinsights_llm_simulation/"
+DATA_FOLDER = "codeinsights_llm_simulation/"
 
 if __name__ == "__main__":
     # Convert outputs to dataframe
     print("Converting results to df...")
     for scenario in LIST_SCENARIOS:
-        for llm in LIST_LLMS:
+        for llm in LIST_OS_LLMS:
             output_path = os.path.join(
-                OUTPUT_FOLDER,
+                DATA_FOLDER,
                 f"opensource_llm_output/{llm}/{scenario}/scenario_state.json",
             )
-
             # Pre-processing model outputs
             output_df = response_to_df(path=output_path, scenario=scenario)
 
@@ -38,14 +46,14 @@ if __name__ == "__main__":
             llm = "_".join(llm.split("_")[1:])
             os.makedirs(
                 os.path.join(
-                    OUTPUT_FOLDER,
+                    DATA_FOLDER,
                     f"scenario_results/{llm}",
                 ),
                 exist_ok=True,
             )
             output_df.to_csv(
                 os.path.join(
-                    OUTPUT_FOLDER,
+                    DATA_FOLDER,
                     f"scenario_results/{llm}/{llm}_scenario{scenario_id}.csv",
                 )
             )
@@ -53,7 +61,7 @@ if __name__ == "__main__":
 
     # Read question data
     question_data = pd.read_csv(
-        os.path.join(OUTPUT_FOLDER, "codeinsights_question.csv")
+        os.path.join(DATA_FOLDER, "codeinsights_question.csv")
     )
 
     # Compute metrics
@@ -74,10 +82,11 @@ if __name__ == "__main__":
         for llm in LIST_LLMS:
             print(f"    + LLM: {llm}...")
             # Load results
-            llm = "_".join(llm.split("_")[1:])
+            if llm in LIST_OS_LLMS:
+                llm = "_".join(llm.split("_")[1:])
             scenario_output_df = pd.read_csv(
                 os.path.join(
-                    OUTPUT_FOLDER,
+                    DATA_FOLDER,
                     f"scenario_results/{llm}/{llm}_scenario{scenario_id}.csv",
                 )
             )

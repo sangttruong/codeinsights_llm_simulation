@@ -10,7 +10,7 @@ import numpy as np
 import time
 from jinja2 import Template
 from typing import List, Dict
-from scenario2_metrics import CodeSimilarityCalculator
+from cossim_calculator import CodeSimilarityCalculator
 
 
 def response_to_df(path, scenario):
@@ -179,22 +179,12 @@ def generate_code(
 
 
 def get_scenario_student_df(scenario, data_folder):
-    if scenario == "S1" or scenario == "S2":
-        scenario_student_df = pd.read_csv(
-            os.path.join(
-                data_folder,
-                "Scenario1_2_data.csv",
-            )
+    scenario_student_df = pd.read_csv(
+        os.path.join(
+            data_folder,
+            f"Scenario{scenario_id}_full_data.csv",
         )
-    else:
-        scenario_id = scenario[1:]
-        scenario_student_df = pd.read_csv(
-            os.path.join(
-                data_folder,
-                f"Scenario{scenario_id}_data.csv",
-            )
-        )
-
+    )
     return scenario_student_df
 
 
