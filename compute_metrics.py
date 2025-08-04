@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     # Read question data
     question_data = pd.read_csv(
-        os.path.join(DATA_FOLDER, "codeinsights_question.csv")
+        os.path.join(DATA_FOLDER, "data/codeinsights_question.csv")
     )
 
     # Compute metrics

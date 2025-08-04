@@ -180,7 +180,7 @@ if __name__ == "__main__":
             )
     #Load all question
     question_data = pd.read_csv(
-        os.path.join(_FOLDER, "codeinsights_question.csv")
+        os.path.join(_FOLDER, "data/codeinsights_question.csv")
     )
     #Ability Correlation
     merged_ability    = load_and_merge(model_map, "ability", "student_id", "ability")
