@@ -27,7 +27,7 @@ LIST_LLMS = [
 
 LIST_SCENARIOS = ["S1", "S2", "S3", "S4"]
 
-DATA_FOLDER = "codeinsights_llm_simulation/"
+DATA_FOLDER = "https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/"
 
 if __name__ == "__main__":
     # Convert outputs to dataframe

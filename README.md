@@ -38,13 +38,12 @@ This project evaluates LLMs' ability to:
 ├── run_commercialLLM_model.py   # Commercial LLM execution runner
 ├── utils.py                     # Core utilities and helper functions
 ├── cossim_calculator.py         # Code similarity calculation (AST + CodeBERT)
-├── psychometrics_metrics.py     # Rasch model and psychometric analysis
-└── codeinsights_llm_simulation/ # Data directory
-    ├── scenario_results/        # Generated results by model
-    ├── ability/                 # Student ability estimates
-    ├── difficulty/              # Item difficulty estimates
-    └── correlations/            # Correlation analysis results
+└── psychometrics_metrics.py     # Rasch model and psychometric analysis
 ```
+
+**Data Storage**: All input and output data is managed through HuggingFace Datasets:
+- **Input Data**: Downloaded from `https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation`
+- **Output Data**: Results are written back to the HuggingFace dataset repository
 
 ## Evaluation Scenarios
 
@@ -81,6 +80,8 @@ This project evaluates LLMs' ability to:
 ### Prerequisites
 - Python 3.8+
 - GCC compiler with C++17 support
+- Internet connection (for HuggingFace Datasets access)
+- HuggingFace account with write access to the dataset repository
 - Required Python packages:
 
 ```bash
@@ -88,8 +89,20 @@ pip install pandas numpy scipy matplotlib seaborn
 pip install transformers torch sklearn
 pip install anthropic google-generativeai openai mistralai
 pip install tree-sitter tree-sitter-cpp apted
-pip install jinja2 requests
+pip install jinja2 requests datasets huggingface_hub
 ```
+
+### HuggingFace Setup
+1. **Install HuggingFace CLI**: `pip install huggingface_hub`
+2. **Login to HuggingFace**: `huggingface-cli login`
+3. **Dataset Access**: Ensure you have write permissions to `Kazchoko/codeinsights_llm_simulation`
+
+### Data Source
+The evaluation dataset is hosted on HuggingFace Datasets:
+- **Dataset URL**: https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation
+- **Input Files**: Scenario data, student performance data, and question templates
+- **Output Files**: Results are automatically uploaded back to the same repository
+- **Auto-sync**: The system handles both downloading inputs and uploading results
 
 ### API Keys Setup
 Set the following environment variables:
@@ -107,9 +120,9 @@ export MISTRAL_API_KEY="your_mistral_key"
 python run_commercialLLM_model.py
 ```
 This script:
-- Processes all 4 scenarios
+- Downloads scenario data from HuggingFace Datasets
 - Runs evaluation with all commercial LLMs
-- Saves results to `scenario_results/` directory
+- Uploads results back to HuggingFace in `scenario_results/` directory
 - Includes parallel processing with rate limiting
 
 ### 2. Compute Comprehensive Metrics
@@ -117,20 +130,22 @@ This script:
 python compute_metrics.py
 ```
 This script:
-- Processes LLM outputs into structured DataFrames
+- Downloads LLM outputs from HuggingFace
+- Processes outputs into structured DataFrames
 - Executes generated code with unit tests
 - Computes all evaluation metrics
-- Saves results to `all_results.json`
+- Uploads `all_results.json` to HuggingFace
 
 ### 3. Psychometric Analysis
 ```bash
 python psychometrics_metrics.py
 ```
 This script:
+- Downloads scenario results from HuggingFace
 - Performs Rasch model analysis
 - Computes ability and difficulty estimates
 - Calculates correlations between models and ground truth
-- Saves correlation results
+- Uploads results to `ability/`, `difficulty/`, and `correlations/` directories
 
 ### 4. Code Similarity Analysis
 The `CodeSimilarityCalculator` class provides:
@@ -178,7 +193,7 @@ result_df = calculator.process_dataframe(df)
 ## Data Format
 
 ### Input Data Structure
-The system expects CSV files with the following key columns:
+The system automatically downloads data from HuggingFace with the following key columns:
 - `question_id`: Unique identifier for each coding problem
 - `student_id`: Unique identifier for each student (Scenarios 2-4)
 - `question_text`: Problem description
@@ -186,8 +201,18 @@ The system expects CSV files with the following key columns:
 - `question_unittests`: Formatted unit test cases
 - `response`: Student's actual code solution
 
+**Data Files** (automatically downloaded from HuggingFace):
+- `Scenario1_full_data.csv`: Basic coding problems
+- `Scenario2_full_data.csv`: Student behavior simulation data
+- `Scenario3_full_data.csv`: Mistake pattern data
+- `Scenario4_full_data.csv`: Efficiency alignment data
+- `student_performace_by_topic.csv`: Student performance profiles
+- `codeinsights_question.csv`: Question metadata
+
 ### Output Data Structure
-Results are saved in JSON format with nested structure:
+Results are uploaded to the HuggingFace dataset repository:
+- **Scenario Results**: `scenario_results/{model_name}/{model_name}_scenario{X}.csv`
+- **Metrics**: `all_results.json` with nested structure:
 ```json
 {
   "S1": {
@@ -201,6 +226,10 @@ Results are saved in JSON format with nested structure:
   "S4": { ... }
 }
 ```
+- **Psychometric Data**: `ability/` and `difficulty/` directories with model-specific estimates
+- **Correlations**: `correlations/all_correlations.json`
+
+All outputs are automatically synced to: `https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation`
 
 ## Technical Details
 
@@ -254,13 +283,18 @@ If you use this evaluation framework in your research, please cite:
 2. **API Rate Limits**: Adjust `delay` and `max_workers` parameters in LLM runners
 3. **Memory Issues**: Large datasets may require increased system memory
 4. **Missing Dependencies**: Install all required packages using pip
+5. **HuggingFace Authentication**: Ensure you're logged in with `huggingface-cli login`
+6. **Dataset Access**: Verify write permissions to the HuggingFace dataset repository
+7. **Network Issues**: Ensure stable internet connection for HuggingFace operations
+8. **Upload Failures**: Check HuggingFace status and retry if needed
 
 ### Performance Optimization
 
 - Use parallel processing for large datasets
-- Cache intermediate results when possible
 - Monitor API usage to avoid rate limits
 - Consider using local models for development
+- Batch HuggingFace uploads when possible
+- Cache intermediate results to avoid re-computation
 
 ## Contact
 
