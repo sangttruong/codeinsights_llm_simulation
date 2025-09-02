@@ -20,6 +20,8 @@ This project evaluates LLMs across four distinct scenarios:
 
 ## Installation
 
+### Python Dependencies
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -29,6 +31,14 @@ cd codeinsights-llm-simulation
 pip install pandas numpy requests jinja2 anthropic openai google-generativeai mistralai
 pip install transformers torch scikit-learn apted tree-sitter tree-sitter-cpp
 pip install scipy matplotlib seaborn tueplots huggingface-hub
+```
+
+### R Dependencies (Optional)
+
+For advanced testlet analysis:
+
+```r
+install.packages(c("dplyr", "tidyr", "ggplot2", "brms", "pROC"))
 ```
 
 ## Quick Start
@@ -105,20 +115,42 @@ This script:
 
 **Output**: Creates correlation matrices in `correlations/all_correlations.json`.
 
+### 5. Advanced Testlet Analysis (R)
+
+For deeper psychometric modeling using Testlet Response Theory:
+
+```r
+# Install R dependencies
+install.packages(c("dplyr", "tidyr", "ggplot2", "brms", "pROC"))
+
+# Run the analysis
+Rscript codeinsights_testlet_analysis.R
+```
+
+This script:
+- Implements Testlet Response Theory (TRT) with Bayesian modeling
+- Accounts for local item dependence within coding problem clusters
+- Generates ROC-AUC evaluation and person fit statistics
+- Extracts and visualizes random effects for students, items, and testlets
+- Provides comprehensive difficulty analysis by testlet groupings
+
+**Output**: ROC plots, person fit statistics, and testlet-adjusted difficulty estimates.
+
 ## Project Structure
 
 ```
-├── data_preprocessing.py      # Data preparation and scenario generation
-├── run_commercial_model.py    # LLM API integration and prompt execution
-├── compute_metrics.py         # Main metrics calculation pipeline
-├── utils.py                   # Core utilities for code execution and metrics
-├── cossim_calculator.py       # AST and semantic similarity computation
-├── psychometrics_metrics.py   # IRT-based psychometric analysis
-├── data/                      # Processed datasets
-├── scenario_results/          # LLM outputs by model and scenario
-├── ability/                   # Student ability parameter estimates
-├── difficulty/                # Item difficulty parameter estimates
-└── correlations/              # Psychometric correlation results
+├── data_preprocessing.py           # Data preparation and scenario generation
+├── run_commercial_model.py         # LLM API integration and prompt execution
+├── compute_metrics.py              # Main metrics calculation pipeline
+├── utils.py                        # Core utilities for code execution and metrics
+├── cossim_calculator.py            # AST and semantic similarity computation
+├── psychometrics_metrics.py        # IRT-based psychometric analysis
+├── codeinsights_testlet_analysis.R # Advanced Testlet Response Theory analysis
+├── data/                           # Processed datasets
+├── scenario_results/               # LLM outputs by model and scenario
+├── ability/                        # Student ability parameter estimates
+├── difficulty/                     # Item difficulty parameter estimates
+└── correlations/                   # Psychometric correlation results
 ```
 
 ## Scenarios Explained
@@ -158,6 +190,9 @@ This script:
 ### Psychometric Metrics
 - **Ability Correlation**: Pearson correlation of estimated student abilities
 - **Difficulty Correlation**: Pearson/Spearman correlation of item difficulties
+- **Testlet Effects**: Random effects modeling for problem clusters (TRT analysis)
+- **Person Fit**: Infit/outfit statistics for individual response patterns
+- **Model Comparison**: ROC-AUC evaluation across different psychometric models
 
 ## Supported Models
 
@@ -214,3 +249,11 @@ When extending the framework:
 2. Add comprehensive error handling
 3. Update documentation for new metrics or models
 4. Test with small datasets before full runs
+
+## License
+
+[Add appropriate license information]
+
+## Citation
+
+[Add citation information for the research paper]
