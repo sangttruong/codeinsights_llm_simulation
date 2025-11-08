@@ -1,6 +1,6 @@
 # CodeInsights LLM Simulation
 
-A comprehensive evaluation framework for assessing Large Language Models (LLMs) on coding tasks through multiple scenarios, measuring functional correctness, behavioral alignment, and psychometric properties.
+A comprehensive evaluation framework for assessing Large Language Models (LLMs) on simulating student coding tasks through multiple scenarios, measuring functional correctness, behavioral alignment, and psychometric properties.
 
 ## Overview
 
@@ -12,10 +12,9 @@ This project evaluates LLMs across four distinct scenarios:
 
 ## Features
 
-- **Multi-Model Support**: Claude, GPT-4, Gemini, Mistral, and open-source models
+- **Multi-Model Support**: Claude-3.5, GPT-4o, Gemini-2.5-pro, Mistral, and open-source models
 - **Comprehensive Metrics**: Functional correctness, AST edit distance, CodeBERT similarity, psychometric correlations
-- **Parallel Processing**: Efficient API calls with rate limiting
-- **Code Similarity Analysis**: Advanced AST parsing and semantic similarity measurements
+- **Code Similarity Analysis**: AST parsing and semantic similarity measurements (Cosine Similarity)
 - **Psychometric Analysis**: IRT-based ability and difficulty parameter estimation
 
 ## Installation
@@ -33,9 +32,9 @@ pip install transformers torch scikit-learn apted tree-sitter tree-sitter-cpp
 pip install scipy matplotlib seaborn tueplots huggingface-hub
 ```
 
-### R Dependencies (Optional)
+### R Dependencies
 
-For advanced testlet analysis:
+For IRT and testlet analysis:
 
 ```r
 install.packages(c("dplyr", "tidyr", "ggplot2", "brms", "pROC"))
@@ -128,7 +127,7 @@ Rscript codeinsights_testlet_analysis.R
 ```
 
 This script:
-- Implements Testlet Response Theory (TRT) with Bayesian modeling
+- Implements Testlet Response Theory (TRT)
 - Accounts for local item dependence within coding problem clusters
 - Generates ROC-AUC evaluation and person fit statistics
 - Extracts and visualizes random effects for students, items, and testlets
@@ -155,22 +154,22 @@ This script:
 
 ## Scenarios Explained
 
-### Scenario 1: Basic Problem Solving
+### Scenario 1: Code Correctness
 - **Goal**: Measure fundamental coding ability
 - **Input**: Question description and template
 - **Metric**: Functional correctness
 
-### Scenario 2: Student Behavior Simulation
+### Scenario 2: Code Performance Imitation
 - **Goal**: Replicate individual student coding patterns
 - **Input**: Student profile + example submissions + target problem
 - **Metrics**: Functional correctness + AST similarity + CodeBERT similarity
 
-### Scenario 3: Mistake Pattern Replication
+### Scenario 3: Targetted Error
 - **Goal**: Generate realistic coding mistakes
 - **Input**: Student profile + past mistakes + target problem
 - **Metrics**: All Scenario 2 metrics + mistake pattern alignment
 
-### Scenario 4: Efficiency-Aware Correct Solutions
+### Scenario 4: Efficiency Alignment
 - **Goal**: Generate correct solutions matching student efficiency
 - **Input**: Student profile + correct examples + target problem
 - **Metrics**: All previous metrics + runtime efficiency alignment
@@ -198,8 +197,8 @@ This script:
 
 ### Commercial Models
 - **Claude**: Sonnet 4 (claude-sonnet-4-20250514)
-- **GPT-4**: o1-mini
-- **Gemini**: 1.5-flash
+- **GPT-4**: o4-mini
+- **Gemini**: 2.0-flash
 - **Mistral**: mistral-large-latest
 
 ### Open Source Models
@@ -214,7 +213,7 @@ This script:
 - Default settings are conservative to avoid rate limiting
 
 ### Data Sources
-- Base URL: `https://huggingface.co/datasets/Kazchoko/codeinsights_llm_simulation/resolve/main/`
+- Base URL: `https://huggingface.co/datasets/CodeInsightTeam/code_insights_csv/tree/main`
 - Student data: `stair-lab/code_insights_csv`
 
 ### Code Execution Environment
@@ -223,10 +222,6 @@ This script:
 - Supports C++ with standard libraries
 
 ## Output Files
-
-### Primary Results
-- `all_results.json`: Complete metrics across all scenarios and models
-- `all_correlations.json`: Psychometric correlation analysis
 
 ### Intermediate Data
 - `scenario_results/{model}/{model}_scenario{1-4}.csv`: Raw LLM responses
@@ -249,11 +244,3 @@ When extending the framework:
 2. Add comprehensive error handling
 3. Update documentation for new metrics or models
 4. Test with small datasets before full runs
-
-## License
-
-[Add appropriate license information]
-
-## Citation
-
-[Add citation information for the research paper]
